@@ -1,7 +1,25 @@
+// Data service backed by Arvados.
+//
+// c = new ArvadosConnection('xyzzy'); // connect to xyzzy.arvadosapi.com
+// c.token('asdfasdf'); // set token
+// c.state(); // 'loading'
+// c.ready.then(function() { c.state() }); // 'ready'
+//
+// // This part needs a better API:
+// nodelist = m.prop();
+// c.ready.then(function() { c.Node.list().then(nodelist) });
+//
+// // Better?
+// nodelist = m.deferred();
+// nodelist = c.api('nodes.list', {filters: []}, nodelist);
+// nodelist(); // undefined
+// nodelist.then(function() { nodelist(); }); // [{uuid:...},...]
+
 function ArvadosConnection(apiPrefix) {
     var connection = this;
     connection.discoveryDoc = m.prop();
     connection.state = m.prop('loading');
+    connection.api = api;
     connection.token = token;
     connection.loginLink = loginLink;
 
@@ -15,10 +33,14 @@ function ArvadosConnection(apiPrefix) {
     connection.ready.
         then(connection.discoveryDoc).
         then(setupModelClasses).
-        then(m.redraw, function(err){connection.state('error: '+err); m.redraw();});
+        then(m.redraw,
+             function(err){connection.state('error: '+err); m.redraw();});
 
     // Public methods
 
+    // URL that will initiate the login process, pass the new token to
+    // localStorage via login-callback, then return to the current
+    // route.
     function loginLink() {
         var dd = connection.discoveryDoc();
         if (!dd) return null;
@@ -27,8 +49,8 @@ function ArvadosConnection(apiPrefix) {
              '&return_to=' + encodeURIComponent(m.route())));
     }
 
-    // Private methods
-
+    // getter-setter, backed by localStorage. Currently supports only
+    // one connection per apiPrefix.
     function token(newToken) {
         var tokens;
         try {
@@ -45,30 +67,54 @@ function ArvadosConnection(apiPrefix) {
         }
     }
 
+    // Wait for discovery doc if necessary, then perform API call and
+    // resolve the returned promise.
+    //
+    // modelClass: 'Collection', 'Node', etc.
+    // action: 'get', 'list', 'update', etc.
+    // params: {uuid:'foo',filters:[],...}
+    // deferred (optional): deferred object for response. If not
+    // supplied, a new one is created.
+    function api(modelClass, action, params, deferred) {
+        deferred = deferred || m.deferred();
+        connection.ready.then(function() {
+            connection[modelClass][action](params).then(
+                deferred.resolve, deferred.reject);
+        }, deferred.reject);
+        return deferred.promise;
+    }
+
+    // Private methods
+
     function ModelClass(resourceName) {
         var resourceClass = function() {
             var model = this;
         };
         resourceClass.resourceName = resourceName;
         resourceClass.addAction = function(action, method) {
-            resourceClass[action] = function(data) {
-                var dd = connection.discoveryDoc();
-                var path = method.path.replace(/{(.*?)}/, function(_, key) {
-                    var val = data[key];
-                    delete data[key];
+            resourceClass[action] = function(params) {
+                var path, dd, postdata = {};
+                params = params || {};
+                dd = connection.discoveryDoc();
+                Object.keys(params).map(function(key) {
+                    if (params[key] instanceof Object)
+                        postdata[key] = JSON.stringify(params[key]);
+                    else
+                        postdata[key] = params[key];
+                });
+                path = method.path.replace(/{(.*?)}/, function(_, key) {
+                    var val = postdata[key];
+                    delete postdata[key];
                     return encodeURIComponent(val);
                 });
                 path = dd.rootUrl + dd.servicePath + path;
-                data = data || {};
-                // console.log(['Perform action', action, method, 'on', this, ':', method.httpMethod, path, data]);
                 return request({
                     method: method.httpMethod,
-                    url: path
+                    url: path,
+                    data: postdata,
                 });
             };
-            // console.log(['Added action', action, method]);
         };
-        // console.log('Created resource '+resourceName);
         return resourceClass;
     }
 

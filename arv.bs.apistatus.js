@@ -8,12 +8,10 @@ var ArvBsApistatus = function() {
             vm.refresh();
         };
         vm.refresh = function() {
-            vm.keepDisks = m.prop({items:[]});
-            vm.nodes = m.prop({items:[]});
-            vm.connection.ready.then(function() {
-                vm.connection.Node.list().then(vm.nodes);
-                vm.connection.KeepDisk.list().then(vm.keepDisks);
-            });
+            vm.nodes = vm.connection.api(
+                'Node', 'list', {});
+            vm.keepDisks = vm.connection.api(
+                'KeepDisk', 'list', {});
         };
         vm.logout = function() {
             vm.connection.token(undefined);
@@ -43,7 +41,7 @@ var ArvBsApistatus = function() {
                       ]);
                   })),
                 m('div.col-md-4', [
-                    m('ul', [
+                    !vm.keepDisks() ? '' : m('ul', [
                         '' + vm.keepDisks().items.length + ' disks',
                         vm.keepDisks().items.map(function(keepDisk) {
                             return m('li', keepDisk.uuid);
@@ -51,7 +49,7 @@ var ArvBsApistatus = function() {
                      ]),
                 ]),
                 m('div.col-md-4', [
-                    m('ul', [
+                    !vm.nodes() ? '' : m('ul', [
                         '' + vm.nodes().items.length + ' nodes',
                         vm.nodes().items.filter(function(node) {
                             return true;
