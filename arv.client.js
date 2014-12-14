@@ -7,11 +7,12 @@ function ArvadosClient(apiPrefix) {
 
     // Initialize
 
-    m.request({
+    client.ready = m.request({
         background: true,
         method: 'GET',
         url: 'https://' + apiPrefix + '.arvadosapi.com/discovery/v1/apis/arvados/v1/rest'
-    }).
+    });
+    client.ready.
         then(client.discoveryDoc).
         then(setupModelClasses).
         then(m.redraw, function(err){client.state('error: '+err); m.redraw();});
