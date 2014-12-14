@@ -2,15 +2,47 @@ function ArvadosClient(apiPrefix) {
     var client = this;
     client.discoveryDoc = m.prop();
     client.state = m.prop('loading');
-    client.token = m.prop();
+    client.token = token;
+    client.loginLink = loginLink;
+
+    // Initialize
+
     m.request({
         background: true,
         method: 'GET',
         url: 'https://' + apiPrefix + '.arvadosapi.com/discovery/v1/apis/arvados/v1/rest'
     }).
-        then(client.discoveryDoc, function(err){client.state('error: '+err); m.redraw();}).
+        then(client.discoveryDoc).
         then(setupModelClasses).
-        then(m.redraw);
+        then(m.redraw, function(err){client.state('error: '+err); m.redraw();});
+
+    // Public methods
+
+    function loginLink() {
+        var dd = client.discoveryDoc();
+        if (!dd) return null;
+        return dd.rootUrl + 'login?return_to=' + encodeURIComponent(
+            (location.origin + '/?/login-callback?apiPrefix=' + apiPrefix +
+             '&return_to=' + encodeURIComponent(m.route())));
+    }
+
+    // Private methods
+
+    function token(newToken) {
+        var tokens;
+        try {
+            tokens = JSON.parse(window.localStorage.tokens);
+        } catch(e) {
+            tokens = {};
+        }
+        if (arguments.length === 0) {
+            return tokens[apiPrefix];
+        } else {
+            tokens[apiPrefix] = newToken;
+            window.localStorage.tokens = JSON.stringify(tokens);
+            return newToken;
+        }
+    }
 
     function ModelClass(resourceName) {
         var resourceClass = function() {

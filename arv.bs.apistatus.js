@@ -1,11 +1,22 @@
-var ArvBsApistatus = function(client, apiPrefix) {
+var ArvBsApistatus = function() {
     var apistatus = {};
-    apistatus.vm = {
+    apistatus.vm = (function() {
+        var vm = {};
+        vm.init = function(client, apiPrefix) {
+            vm.client = client;
+            vm.apiPrefix = apiPrefix;
+        };
+        vm.logout = function() {
+            vm.client.token(undefined);
+        };
+        return vm;
+    })();
+    apistatus.controller = function(client, apiPrefix) {
+        apistatus.vm.init(client, apiPrefix);
     };
-    apistatus.controller = function() {
-    };
-    apistatus.view = function() {
-        var dd = client.discoveryDoc();
+    apistatus.view = function(ctrl) {
+        var vm = apistatus.vm;
+        var dd = vm.client.discoveryDoc();
         var show = !dd ? {} : {
             apiVersion: dd.version + ' (' + dd.revision + ')',
             sourceVersion: m('a', {
@@ -13,14 +24,24 @@ var ArvBsApistatus = function(client, apiPrefix) {
             }, dd.source_version),
             generatedAt: dd.generatedAt
         };
-        var content = !dd ? client.state() : Object.keys(show).map(function(key) {
+        var content = !dd ? vm.client.state() : Object.keys(show).map(function(key) {
             return m('div.row', [
                 m('div.col-sm-4.lighten', key),
                 m('div.col-sm-8', show[key]),
             ]);
         });
+        var logInOrOut = vm.client.token() ? ((
+            m('a.btn.btn-xs.btn-default.pull-right',
+              {onclick: vm.logout}, 'Log out')
+        )) : ((
+            m('a.btn.btn-xs.btn-primary.pull-right',
+              {href: vm.client.loginLink()}, 'Log in')
+        ))
         return m('div.panel.panel-info.arv-bs-api-status', [
-            m('div.panel-heading', apiPrefix),
+            m('div.panel-heading', [
+                vm.apiPrefix,
+                logInOrOut,
+            ]),
             m('div.panel-body', content),
         ]);
     };
@@ -29,19 +50,27 @@ var ArvBsApistatus = function(client, apiPrefix) {
 
 var ArvBsApidirectory = function() {
     var apidirectory = {};
-    apidirectory.vm = {
-        clients: [],
-        addClient: function(apiPrefix) {
-            apidirectory.vm.clients.push(
-                new ArvBsApistatus(
-                    new ArvadosClient(apiPrefix), apiPrefix));
-        }
+    apidirectory.vm = (function() {
+        var vm = {};
+        vm.init = function() {
+            vm.statusWidgets = [];
+        };
+        vm.addClient = function(apiPrefix) {
+            var widget = {};
+            widget.component = new ArvBsApistatus();
+            widget.controller = new widget.component.controller(
+                new ArvadosClient(apiPrefix), apiPrefix);
+            vm.statusWidgets.push(widget);
+        };
+        return vm;
+    })();
+    apidirectory.controller = function() {
+        apidirectory.vm.init();
     };
-    apidirectory.controller = function() {};
-    apidirectory.view = function() {
+    apidirectory.view = function(ctrl) {
         return m('div', {style: 'width: 400px; display: inline-block'},
-                 apidirectory.vm.clients.map(function(client) {
-                     return client.view();
+                 apidirectory.vm.statusWidgets.map(function(widget) {
+                     return widget.component.view(widget.controller);
                  }));
     };
     return apidirectory;

@@ -1,6 +1,12 @@
 function ArvBsLayout(components) {
     var layout = {};
     layout.controller = function() {
+        layout.components = components.map(function(component) {
+            return {
+                controller: component.controller(),
+                view: component.view
+            };
+        });
     };
     layout.view = function() {
         return [
@@ -23,8 +29,8 @@ function ArvBsLayout(components) {
                     ]),
                 ]),
             ]),
-            m('div.container-fluid', components.map(function(component) {
-                return component.view();
+            m('div.container-fluid', layout.components.map(function(component) {
+                return component.view(component.controller);
             })),
         ];
     };
