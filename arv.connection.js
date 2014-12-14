@@ -1,26 +1,26 @@
-function ArvadosClient(apiPrefix) {
-    var client = this;
-    client.discoveryDoc = m.prop();
-    client.state = m.prop('loading');
-    client.token = token;
-    client.loginLink = loginLink;
+function ArvadosConnection(apiPrefix) {
+    var connection = this;
+    connection.discoveryDoc = m.prop();
+    connection.state = m.prop('loading');
+    connection.token = token;
+    connection.loginLink = loginLink;
 
     // Initialize
 
-    client.ready = m.request({
+    connection.ready = m.request({
         background: true,
         method: 'GET',
         url: 'https://' + apiPrefix + '.arvadosapi.com/discovery/v1/apis/arvados/v1/rest'
     });
-    client.ready.
-        then(client.discoveryDoc).
+    connection.ready.
+        then(connection.discoveryDoc).
         then(setupModelClasses).
-        then(m.redraw, function(err){client.state('error: '+err); m.redraw();});
+        then(m.redraw, function(err){connection.state('error: '+err); m.redraw();});
 
     // Public methods
 
     function loginLink() {
-        var dd = client.discoveryDoc();
+        var dd = connection.discoveryDoc();
         if (!dd) return null;
         return dd.rootUrl + 'login?return_to=' + encodeURIComponent(
             (location.origin + '/?/login-callback?apiPrefix=' + apiPrefix +
@@ -52,7 +52,7 @@ function ArvadosClient(apiPrefix) {
         resourceClass.resourceName = resourceName;
         resourceClass.addAction = function(action, method) {
             resourceClass[action] = function(data) {
-                var dd = client.discoveryDoc();
+                var dd = connection.discoveryDoc();
                 var path = method.path.replace(/{(.*?)}/, function(_, key) {
                     var val = data[key];
                     delete data[key];
@@ -74,20 +74,20 @@ function ArvadosClient(apiPrefix) {
 
     function request(args) {
         args.config = function(xhr) {
-            xhr.setRequestHeader('Authorization', 'OAuth2 '+client.token());
+            xhr.setRequestHeader('Authorization', 'OAuth2 '+connection.token());
         };
         return m.request(args);
     }
 
     function setupModelClasses(x) {
-        var schemas = client.discoveryDoc().schemas;
+        var schemas = connection.discoveryDoc().schemas;
         Object.keys(schemas).map(function(modelClassName) {
             if (modelClassName.search(/List$/) > -1) return;
             var modelClass = new ModelClass(modelClassName);
             modelClass.schema = schemas[modelClassName];
-            client[modelClassName] = modelClass;
+            connection[modelClassName] = modelClass;
         });
-        var resources = client.discoveryDoc().resources;
+        var resources = connection.discoveryDoc().resources;
         Object.keys(resources).map(function(ctrl) {
             var modelClassName;
             var methods = resources[ctrl].methods;
@@ -97,14 +97,14 @@ function ArvadosClient(apiPrefix) {
                 console.log("Hm, could not handle resource '"+ctrl+"'");
                 return;
             }
-            if (!client[modelClassName]) {
+            if (!connection[modelClassName]) {
                 console.log("Hm, no schema for response type '"+ctrl+"'");
                 return;
             }
             Object.keys(methods).map(function(action) {
-                client[modelClassName].addAction(action, methods[action]);
+                connection[modelClassName].addAction(action, methods[action]);
             });
         });
-        client.state('ready');
+        connection.state('ready');
     }
 }

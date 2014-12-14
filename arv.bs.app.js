@@ -7,5 +7,5 @@ m.route(document.body, '/', {
 });
 
 '4xphq qr1hi 9tee4 su92l bogus'.split(' ').map(function(site) {
-    apidir.vm.addClient(site);
+    apidir.vm.addConnection(site);
 });
