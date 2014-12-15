@@ -16,6 +16,16 @@ var ArvBsApistatus = function() {
         vm.logout = function() {
             vm.connection.token(undefined);
         };
+        vm.ddSummary = function() {
+            var dd = vm.connection.discoveryDoc();
+            return !dd ? {} : {
+                apiVersion: dd.version + ' (' + dd.revision + ')',
+                sourceVersion: m('a', {
+                    href: 'https://arvados.org/projects/arvados/repository/changes?rev=' + dd.source_version
+                }, dd.source_version),
+                generatedAt: dd.generatedAt
+            }
+        };
         return vm;
     })();
     apistatus.controller = function(connection, apiPrefix) {
@@ -24,20 +34,14 @@ var ArvBsApistatus = function() {
     apistatus.view = function(ctrl) {
         var vm = apistatus.vm;
         var dd = vm.connection.discoveryDoc();
-        var show = !dd ? {} : {
-            apiVersion: dd.version + ' (' + dd.revision + ')',
-            sourceVersion: m('a', {
-                href: 'https://arvados.org/projects/arvados/repository/changes?rev=' + dd.source_version
-            }, dd.source_version),
-            generatedAt: dd.generatedAt
-        };
+        var ddSummary = vm.ddSummary();
         var content = !dd ? vm.connection.state() : (
             m('div.row', [
                 m('div.col-md-4',
-                  Object.keys(show).map(function(key) {
+                  Object.keys(ddSummary).map(function(key) {
                       return m('div.row', [
                           m('div.col-sm-4.lighten', key),
-                          m('div.col-sm-8', show[key]),
+                          m('div.col-sm-8', ddSummary[key]),
                       ]);
                   })),
                 m('div.col-md-4', [
@@ -52,7 +56,7 @@ var ArvBsApistatus = function() {
                     !vm.nodes() ? '' : m('ul', [
                         '' + vm.nodes().items.length + ' nodes',
                         vm.nodes().items.filter(function(node) {
-                            return true;
+                            return node.crunch_worker_state != 'down';
                         }).map(function(node) {
                             return m('li', [
                                 m('span.label.label-default', [
