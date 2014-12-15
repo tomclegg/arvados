@@ -78,11 +78,16 @@ function ArvadosConnection(apiPrefix) {
     function api(modelClass, action, params, deferred) {
         deferred = deferred || m.deferred();
         connection.ready.then(function() {
-            connection[modelClass][action](params).then(
-                deferred.resolve, deferred.reject);
+            connection[modelClass][action](params).
+                then(updateStore).
+                then(deferred.resolve, deferred.reject);
         }, deferred.reject);
         return deferred.promise;
     }
+
+    // Private instance variables
+
+    var store = {};
 
     // Private methods
 
@@ -115,6 +120,10 @@ function ArvadosConnection(apiPrefix) {
                 });
             };
         };
+        resourceClass.find = function(uuid) {
+            if (store[uuid]) return store[uuid];
+            else return api(resourceName, 'get', {uuid:uuid});
+        };
         return resourceClass;
     }
 
@@ -123,6 +132,17 @@ function ArvadosConnection(apiPrefix) {
             xhr.setRequestHeader('Authorization', 'OAuth2 '+connection.token());
         };
         return m.request(args);
+    }
+
+    // Update local cache with data just received in API response.
+    function updateStore(response) {
+        if (response.items) {
+            response.items.map(updateStore);
+        } else if (response.uuid) {
+            store[response.uuid] = store[response.uuid] || m.prop();
+            store[response.uuid](response);
+        }
+        return response;
     }
 
     function setupModelClasses(x) {
