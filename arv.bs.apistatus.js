@@ -14,8 +14,8 @@ function ArvBsApistatus(connection, apiPrefix) {
         vm.refresh = function() {
             vm.nodes = vm.connection.api(
                 'Node', 'list', {});
-            vm.keepDisks = vm.connection.api(
-                'KeepDisk', 'list', {});
+            vm.keepServices = vm.connection.api(
+                'KeepService', 'list', {});
         };
         vm.logout = function() {
             vm.connection.token(undefined);
@@ -71,20 +71,27 @@ function ArvBsApistatus(connection, apiPrefix) {
                           ]);
                       })),
                     m('.col-md-4', [
-                        !vm.keepDisks() ? '' : m('ul', [
-                            '' + vm.keepDisks().length + ' disks',
-                            vm.keepDisks().map(function(keepDisk) {
+                        !vm.keepServices() ? '' : m('ul', [
+                            '' + vm.keepServices().length + ' Keep services',
+                            vm.keepServices().map(function(keepService) {
                                 return m('li', [
-                                    m('a', {href: '/show/'+keepDisk().uuid,
-                                            config: m.route},
-                                      keepDisk().uuid),
+                                    m('span.label.label-default',
+                                      keepService().service_type),
+                                    ' ',
+                                    m('a',
+                                      {href: '/show/'+keepService().uuid,
+                                       config: m.route}, [
+                                           keepService().service_host,
+                                           ':',
+                                           keepService().service_port,
+                                       ]),
                                 ]);
                             }),
                         ]),
                     ]),
                     m('.col-md-4', [
                         !vm.nodes() ? '' : m('ul', [
-                            '' + vm.nodes().length + ' nodes',
+                            '' + vm.nodes().length + ' worker nodes',
                             vm.nodes().filter(function(node) {
                                 return node().crunch_worker_state != 'down';
                             }).map(function(node) {
@@ -95,9 +102,9 @@ function ArvBsApistatus(connection, apiPrefix) {
                                     ' ',
                                     m('a', {href: '/show/'+node().uuid,
                                             config: m.route},
-                                      node().uuid),
+                                      node().hostname),
                                     ' ',
-                                    m('span.label.label-info', [
+                                    m('span.label.label-info', {title: 'time since last ping'}, [
                                         ((new Date() - Date.parse(node().last_ping_at))/1000).toFixed(),
                                         's'
                                     ]),
