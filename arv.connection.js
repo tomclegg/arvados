@@ -123,15 +123,15 @@ function ArvadosConnection(apiPrefix) {
                 });
             };
         };
-        resourceClass.find = function(uuid) {
-            if (store[uuid]) return store[uuid];
+        resourceClass.find = function(uuid, refreshFlag) {
+            if (!refreshFlag && store[uuid]) return store[uuid];
             else return api(resourceName, 'get', {uuid:uuid});
         };
         return resourceClass;
     }
 
-    function find(uuid) {
-        if (!store[uuid]) store[uuid] = m.prop();
+    function find(uuid, refreshFlag) {
+        refreshFlag = refreshFlag || !store[uuid];
         connection.ready.then(function() {
             var infix = uuid.slice(6,11);
             var className = uuidInfixClassName[infix];
@@ -139,8 +139,9 @@ function ArvadosConnection(apiPrefix) {
             if (!theClass) {
                 throw new Error("No class for "+className+" for infix "+infix);
             }
-            return theClass.find(uuid);
+            theClass.find(uuid, refreshFlag);
         });
+        store[uuid] = store[uuid] || m.prop();
         return store[uuid];
     }
 

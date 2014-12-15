@@ -2,10 +2,13 @@ function ArvBsApistatus(connection, apiPrefix) {
     var apistatus = {};
     apistatus.vm = (function() {
         var vm = {};
-        vm.init = function(connection, apiPrefix) {
-            vm.connection = connection;
-            vm.apiPrefix = apiPrefix;
-            vm.refresh();
+        vm.connection = connection;
+        vm.apiPrefix = apiPrefix;
+        vm.dirty = true;
+        vm.init = function() {
+            if (vm.dirty)
+                vm.refresh();
+            vm.dirty = false;
         };
         vm.refresh = function() {
             vm.nodes = vm.connection.api(
@@ -28,8 +31,8 @@ function ArvBsApistatus(connection, apiPrefix) {
         };
         return vm;
     })();
-    apistatus.vm.init(connection, apiPrefix);
     apistatus.controller = function() {
+        apistatus.vm.init(connection, apiPrefix);
     };
     apistatus.view = function() {
         var vm = apistatus.vm;
@@ -99,8 +102,9 @@ var ArvBsApidirectory = function() {
     var apidirectory = {};
     apidirectory.vm = (function() {
         var vm = {};
+        vm.widgets = [];
         vm.init = function() {
-            vm.widgets = [];
+            // Don't reinitialize when reused.
         };
         vm.addConnection = function(apiPrefix) {
             vm.widgets.push(new ArvBsApistatus(
@@ -108,8 +112,8 @@ var ArvBsApidirectory = function() {
         };
         return vm;
     })();
-    apidirectory.vm.init();
     apidirectory.controller = function() {
+        apidirectory.vm.init();
     };
     apidirectory.view = function() {
         return m('div',
