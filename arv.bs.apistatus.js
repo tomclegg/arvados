@@ -35,53 +35,55 @@ var ArvBsApistatus = function() {
         var vm = apistatus.vm;
         var dd = vm.connection.discoveryDoc();
         var ddSummary = vm.ddSummary();
-        var content = !dd ? vm.connection.state() : (
-            m('div.row', [
-                m('div.col-md-4',
-                  Object.keys(ddSummary).map(function(key) {
-                      return m('div.row', [
-                          m('div.col-sm-4.lighten', key),
-                          m('div.col-sm-8', ddSummary[key]),
-                      ]);
-                  })),
-                m('div.col-md-4', [
-                    !vm.keepDisks() ? '' : m('ul', [
-                        '' + vm.keepDisks().items.length + ' disks',
-                        vm.keepDisks().items.map(function(keepDisk) {
-                            return m('li', keepDisk.uuid);
-                        }),
-                     ]),
-                ]),
-                m('div.col-md-4', [
-                    !vm.nodes() ? '' : m('ul', [
-                        '' + vm.nodes().items.length + ' nodes',
-                        vm.nodes().items.filter(function(node) {
-                            return node.crunch_worker_state != 'down';
-                        }).map(function(node) {
-                            return m('li', [
-                                m('span.label.label-default', [
-                                    node.crunch_worker_state,
-                                ]),
-                                ' ',
-                                node.uuid
-                            ]);
-                        }),
-                    ]),
-                ]),
-            ]));
-        var logInOrOut = vm.connection.token() ? ((
-            m('a.btn.btn-xs.btn-default.pull-right',
-              {onclick: vm.logout}, 'Log out')
-        )) : ((
-            m('a.btn.btn-xs.btn-primary.pull-right',
-              {href: vm.connection.loginLink()}, 'Log in')
-        ))
-        return m('div.panel.panel-info.arv-bs-api-status', [
-            m('div.panel-heading', [
+        return m('.panel.panel-info.arv-bs-api-status', [
+            m('.panel-heading', [
                 vm.apiPrefix,
-                logInOrOut,
+                !dd ? '' : util.choose(!!vm.connection.token(), {
+                    true: [function() {
+                        return m('a.btn.btn-xs.btn-default.pull-right',
+                                 {onclick: vm.logout}, 'Log out');
+                    }],
+                    false: [function() {
+                        return m('a.btn.btn-xs.btn-primary.pull-right',
+                                 {href: vm.connection.loginLink()}, 'Log in');
+                    }]
+                }),
             ]),
-            m('div.panel-body', content),
+            m('.panel-body', !dd ? vm.connection.state() : (
+                m('.row', [
+                    m('.col-md-4',
+                      Object.keys(ddSummary).map(function(key) {
+                          return m('.row', [
+                              m('.col-sm-4.lighten', key),
+                              m('.col-sm-8', ddSummary[key]),
+                          ]);
+                      })),
+                    m('.col-md-4', [
+                        !vm.keepDisks() ? '' : m('ul', [
+                            '' + vm.keepDisks().items.length + ' disks',
+                            vm.keepDisks().items.map(function(keepDisk) {
+                                return m('li', keepDisk.uuid);
+                            }),
+                        ]),
+                    ]),
+                    m('.col-md-4', [
+                        !vm.nodes() ? '' : m('ul', [
+                            '' + vm.nodes().items.length + ' nodes',
+                            vm.nodes().items.filter(function(node) {
+                                return node.crunch_worker_state != 'down';
+                            }).map(function(node) {
+                                return m('li', [
+                                    m('span.label.label-default', [
+                                        node.crunch_worker_state,
+                                    ]),
+                                    ' ',
+                                    node.uuid
+                                ]);
+                            }),
+                        ]),
+                    ]),
+                ]))
+             ),
         ]);
     };
     return apistatus;
