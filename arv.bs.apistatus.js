@@ -81,7 +81,9 @@ function ArvBsApistatus(connection, apiPrefix) {
                                         node.crunch_worker_state,
                                     ]),
                                     ' ',
-                                    node.uuid
+                                    m('a', {href: '/show/'+node.uuid,
+                                            config: m.route},
+                                      node.uuid)
                                 ]);
                             }),
                         ]),
