@@ -3,6 +3,7 @@ function ArvBsApistatus(connection, apiPrefix) {
     apistatus.vm = (function() {
         var vm = {};
         vm.connection = connection;
+        vm.dd = connection.discoveryDoc;
         vm.apiPrefix = apiPrefix;
         vm.dirty = true;
         vm.init = function() {
@@ -20,13 +21,20 @@ function ArvBsApistatus(connection, apiPrefix) {
             vm.connection.token(undefined);
         };
         vm.ddSummary = function() {
-            var dd = vm.connection.discoveryDoc();
-            return !dd ? {} : {
-                apiVersion: dd.version + ' (' + dd.revision + ')',
+            return !vm.dd() ? {} : {
+                apiVersion: vm.dd().version + ' (' + vm.dd().revision + ')',
                 sourceVersion: m('a', {
-                    href: 'https://arvados.org/projects/arvados/repository/changes?rev=' + dd.source_version
-                }, dd.source_version),
-                generatedAt: dd.generatedAt
+                    href: 'https://arvados.org/projects/arvados/repository/changes?rev=' + vm.dd().source_version
+                }, vm.dd().source_version),
+                generatedAt: vm.dd().generatedAt,
+                websocket: util.choose(vm.connection.webSocket.readyState, {
+                    0: m('span.label.label-warning', ['connecting']),
+                    1: m('span.label.label-success', ['OK']),
+                    2: m('span.label.label-danger', ['closing']),
+                    3: m('span.label.label-danger', ['closed']),
+                }) || m('span.label.label-danger',
+                        {title: ('advertised websocketUrl: ' +
+                                 vm.dd().websocketUrl)}, ['none'])
             }
         };
         return vm;
@@ -36,23 +44,24 @@ function ArvBsApistatus(connection, apiPrefix) {
     };
     apistatus.view = function() {
         var vm = apistatus.vm;
-        var dd = vm.connection.discoveryDoc();
         var ddSummary = vm.ddSummary();
         return m('.panel.panel-info.arv-bs-api-status', [
             m('.panel-heading', [
                 vm.apiPrefix,
-                !dd ? '' : util.choose(!!vm.connection.token(), {
-                    true: [function() {
-                        return m('a.btn.btn-xs.btn-default.pull-right',
-                                 {onclick: vm.logout}, 'Log out');
-                    }],
-                    false: [function() {
-                        return m('a.btn.btn-xs.btn-primary.pull-right',
-                                 {href: vm.connection.loginLink()}, 'Log in');
-                    }]
-                }),
+                !vm.dd() ? '' : m('.pull-right', [
+                    util.choose(!!vm.connection.token(), {
+                        true: [function() {
+                            return m('a.btn.btn-xs.btn-default',
+                                     {onclick: vm.logout}, 'Log out');
+                        }],
+                        false: [function() {
+                            return m('a.btn.btn-xs.btn-primary',
+                                     {href: vm.connection.loginLink()}, 'Log in');
+                        }]
+                    }),
+                ]),
             ]),
-            m('.panel-body', !dd ? vm.connection.state() : (
+            m('.panel-body', !vm.dd() ? vm.connection.state() : (
                 m('.row', [
                     m('.col-md-4',
                       Object.keys(ddSummary).map(function(key) {
@@ -63,30 +72,35 @@ function ArvBsApistatus(connection, apiPrefix) {
                       })),
                     m('.col-md-4', [
                         !vm.keepDisks() ? '' : m('ul', [
-                            '' + vm.keepDisks().items.length + ' disks',
-                            vm.keepDisks().items.map(function(keepDisk) {
+                            '' + vm.keepDisks().length + ' disks',
+                            vm.keepDisks().map(function(keepDisk) {
                                 return m('li', [
-                                    m('a', {href: '/show/'+keepDisk.uuid,
+                                    m('a', {href: '/show/'+keepDisk().uuid,
                                             config: m.route},
-                                      keepDisk.uuid),
+                                      keepDisk().uuid),
                                 ]);
                             }),
                         ]),
                     ]),
                     m('.col-md-4', [
                         !vm.nodes() ? '' : m('ul', [
-                            '' + vm.nodes().items.length + ' nodes',
-                            vm.nodes().items.filter(function(node) {
-                                return node.crunch_worker_state != 'down';
+                            '' + vm.nodes().length + ' nodes',
+                            vm.nodes().filter(function(node) {
+                                return node().crunch_worker_state != 'down';
                             }).map(function(node) {
                                 return m('li', [
                                     m('span.label.label-default', [
-                                        node.crunch_worker_state,
+                                        node().crunch_worker_state,
                                     ]),
                                     ' ',
-                                    m('a', {href: '/show/'+node.uuid,
+                                    m('a', {href: '/show/'+node().uuid,
                                             config: m.route},
-                                      node.uuid)
+                                      node().uuid),
+                                    ' ',
+                                    m('span.label.label-info', [
+                                        ((new Date() - Date.parse(node().last_ping_at))/1000).toFixed(),
+                                        's'
+                                    ]),
                                 ]);
                             }),
                         ]),

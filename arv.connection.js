@@ -17,12 +17,14 @@
 
 function ArvadosConnection(apiPrefix) {
     var connection = this;
-    connection.discoveryDoc = m.prop();
+    var dd = m.prop();
+    connection.discoveryDoc = dd;
     connection.state = m.prop('loading');
     connection.api = api;
     connection.find = find;
     connection.loginLink = loginLink;
     connection.token = token;
+    connection.webSocket = m.prop();
 
     // Initialize
 
@@ -34,6 +36,7 @@ function ArvadosConnection(apiPrefix) {
     connection.ready.
         then(connection.discoveryDoc).
         then(setupModelClasses).
+        then(setupWebSocket).
         then(m.redraw,
              function(err){connection.state('error: '+err); m.redraw();});
 
@@ -43,9 +46,8 @@ function ArvadosConnection(apiPrefix) {
     // localStorage via login-callback, then return to the current
     // route.
     function loginLink() {
-        var dd = connection.discoveryDoc();
-        if (!dd) return null;
-        return dd.rootUrl + 'login?return_to=' + encodeURIComponent(
+        if (!dd()) return null;
+        return dd().rootUrl + 'login?return_to=' + encodeURIComponent(
             (location.origin + '/?/login-callback?apiPrefix=' + apiPrefix +
              '&return_to=' + encodeURIComponent(m.route())));
     }
@@ -101,9 +103,8 @@ function ArvadosConnection(apiPrefix) {
         resourceClass.resourceName = resourceName;
         resourceClass.addAction = function(action, method) {
             resourceClass[action] = function(params) {
-                var path, dd, postdata = {};
+                var path, postdata = {};
                 params = params || {};
-                dd = connection.discoveryDoc();
                 Object.keys(params).map(function(key) {
                     if (params[key] instanceof Object)
                         postdata[key] = JSON.stringify(params[key]);
@@ -115,7 +116,7 @@ function ArvadosConnection(apiPrefix) {
                     delete postdata[key];
                     return encodeURIComponent(val);
                 });
-                path = dd.rootUrl + dd.servicePath + path;
+                path = dd().rootUrl + dd().servicePath + path;
                 return request({
                     method: method.httpMethod,
                     url: path,
@@ -154,13 +155,25 @@ function ArvadosConnection(apiPrefix) {
 
     // Update local cache with data just received in API response.
     function updateStore(response) {
+        var items;
         if (response.items) {
-            response.items.map(updateStore);
+            // Return an array of getters, with extra properties
+            // (items_available, etc.) tacked on to the array.
+            items = response.items.map(updateStore);
+            Object.keys(response).map(function(key) {
+                if (key !== 'items') {
+                    items[key] = response[key];
+                }
+            });
+            return items;
         } else if (response.uuid) {
             store[response.uuid] = store[response.uuid] || m.prop();
             store[response.uuid](response);
+            store[response.uuid]()._cacheTime = new Date();
+            return store[response.uuid];
+        } else {
+            return response;
         }
-        return response;
     }
 
     function setupModelClasses(x) {
@@ -191,6 +204,45 @@ function ArvadosConnection(apiPrefix) {
             });
         });
         connection.state('ready');
+    }
+
+    function setupWebSocket() {
+        connection.webSocket = new WebSocket(
+            dd().websocketUrl + '?api_token=' + connection.token());
+        connection.webSocket.onopen = function(event) {
+            // TODO: subscribe to logs about uuids in
+            // connection.store, not everything.
+            connection.webSocket.sendJson({method:'subscribe'});
+        };
+        connection.webSocket.sendJson = function(object) {
+            connection.webSocket.send(JSON.stringify(object));
+        };
+        connection.webSocket.onmessage = function(event) {
+            var message = JSON.parse(event.data);
+            var newAttrs;
+            var objectProp;
+            if (typeof message.object_uuid === 'string' &&
+                message.event_type === 'update' &&
+                message.object_uuid.slice(0,5) === apiPrefix &&
+                (objectProp = store[message.object_uuid])) {
+                newAttrs = message.properties.new_attributes;
+                if (objectProp()) {
+                    // A local copy exists. Update whatever attributes
+                    // we see in the message.
+                    Object.keys(newAttrs).map(function(key) {
+                        objectProp()[key] = newAttrs[key];
+                    });
+                } else {
+                    // We have a getter-setter ready for this object,
+                    // but it has no content yet. TODO: make the
+                    // server send a full API response, not just the
+                    // database columns, with these update messages.
+                    objectProp(newAttrs);
+                }
+                objectProp()._cacheTime = new Date();
+                m.redraw();
+            }
+        }
     }
 }
 ArvadosConnection.connections = {};
