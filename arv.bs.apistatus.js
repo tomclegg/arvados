@@ -62,7 +62,11 @@ var ArvBsApistatus = function() {
                         !vm.keepDisks() ? '' : m('ul', [
                             '' + vm.keepDisks().items.length + ' disks',
                             vm.keepDisks().items.map(function(keepDisk) {
-                                return m('li', keepDisk.uuid);
+                                return m('li', [
+                                    m('a', {href: '/show/'+keepDisk.uuid,
+                                            config: m.route},
+                                      keepDisk.uuid),
+                                ]);
                             }),
                         ]),
                     ]),
@@ -100,15 +104,15 @@ var ArvBsApidirectory = function() {
             var widget = {};
             widget.component = new ArvBsApistatus();
             widget.controller = new widget.component.controller(
-                new ArvadosConnection(apiPrefix), apiPrefix);
+                ArvadosConnection.make(apiPrefix), apiPrefix);
             vm.statusWidgets.push(widget);
         };
         return vm;
     })();
+    apidirectory.vm.init();
     apidirectory.controller = function() {
-        apidirectory.vm.init();
     };
-    apidirectory.view = function(ctrl) {
+    apidirectory.view = function() {
         return m('div',
                  apidirectory.vm.statusWidgets.map(function(widget) {
                      return widget.component.view(widget.controller);

@@ -20,8 +20,9 @@ function ArvadosConnection(apiPrefix) {
     connection.discoveryDoc = m.prop();
     connection.state = m.prop('loading');
     connection.api = api;
-    connection.token = token;
+    connection.find = find;
     connection.loginLink = loginLink;
+    connection.token = token;
 
     // Initialize
 
@@ -80,7 +81,8 @@ function ArvadosConnection(apiPrefix) {
         connection.ready.then(function() {
             connection[modelClass][action](params).
                 then(updateStore).
-                then(deferred.resolve, deferred.reject);
+                then(deferred.resolve, deferred.reject).
+                then(m.redraw);
         }, deferred.reject);
         return deferred.promise;
     }
@@ -88,6 +90,7 @@ function ArvadosConnection(apiPrefix) {
     // Private instance variables
 
     var store = {};
+    var uuidInfixClassName = {};
 
     // Private methods
 
@@ -127,6 +130,20 @@ function ArvadosConnection(apiPrefix) {
         return resourceClass;
     }
 
+    function find(uuid) {
+        if (!store[uuid]) store[uuid] = m.prop();
+        connection.ready.then(function() {
+            var infix = uuid.slice(6,11);
+            var className = uuidInfixClassName[infix];
+            var theClass = connection[className];
+            if (!theClass) {
+                throw new Error("No class for "+className+" for infix "+infix);
+            }
+            return theClass.find(uuid);
+        });
+        return store[uuid];
+    }
+
     function request(args) {
         args.config = function(xhr) {
             xhr.setRequestHeader('Authorization', 'OAuth2 '+connection.token());
@@ -152,6 +169,7 @@ function ArvadosConnection(apiPrefix) {
             var modelClass = new ModelClass(modelClassName);
             modelClass.schema = schemas[modelClassName];
             connection[modelClassName] = modelClass;
+            uuidInfixClassName[schemas[modelClassName].uuidPrefix] = modelClassName;
         });
         var resources = connection.discoveryDoc().resources;
         Object.keys(resources).map(function(ctrl) {
@@ -173,4 +191,13 @@ function ArvadosConnection(apiPrefix) {
         });
         connection.state('ready');
     }
+}
+ArvadosConnection.connections = {};
+ArvadosConnection.make = function(connectionId, apiPrefix) {
+    var conns = ArvadosConnection.connections;
+    apiPrefix = apiPrefix || connectionId;
+    if (!conns[connectionId]) {
+        conns[connectionId] = new ArvadosConnection(apiPrefix);
+    }
+    return conns[connectionId];
 }
