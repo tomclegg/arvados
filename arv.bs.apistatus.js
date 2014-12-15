@@ -1,4 +1,4 @@
-var ArvBsApistatus = function() {
+function ArvBsApistatus(connection, apiPrefix) {
     var apistatus = {};
     apistatus.vm = (function() {
         var vm = {};
@@ -28,10 +28,10 @@ var ArvBsApistatus = function() {
         };
         return vm;
     })();
-    apistatus.controller = function(connection, apiPrefix) {
-        apistatus.vm.init(connection, apiPrefix);
+    apistatus.vm.init(connection, apiPrefix);
+    apistatus.controller = function() {
     };
-    apistatus.view = function(ctrl) {
+    apistatus.view = function() {
         var vm = apistatus.vm;
         var dd = vm.connection.discoveryDoc();
         var ddSummary = vm.ddSummary();
@@ -98,14 +98,11 @@ var ArvBsApidirectory = function() {
     apidirectory.vm = (function() {
         var vm = {};
         vm.init = function() {
-            vm.statusWidgets = [];
+            vm.widgets = [];
         };
         vm.addConnection = function(apiPrefix) {
-            var widget = {};
-            widget.component = new ArvBsApistatus();
-            widget.controller = new widget.component.controller(
-                ArvadosConnection.make(apiPrefix), apiPrefix);
-            vm.statusWidgets.push(widget);
+            vm.widgets.push(new ArvBsApistatus(
+                ArvadosConnection.make(apiPrefix), apiPrefix));
         };
         return vm;
     })();
@@ -114,8 +111,8 @@ var ArvBsApidirectory = function() {
     };
     apidirectory.view = function() {
         return m('div',
-                 apidirectory.vm.statusWidgets.map(function(widget) {
-                     return widget.component.view(widget.controller);
+                 apidirectory.vm.widgets.map(function(widget) {
+                     return widget.view(widget.controller());
                  }));
     };
     return apidirectory;
