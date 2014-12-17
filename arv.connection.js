@@ -209,13 +209,13 @@ function ArvadosConnection(apiPrefix) {
     function setupWebSocket() {
         connection.webSocket = new WebSocket(
             dd().websocketUrl + '?api_token=' + connection.token());
+        connection.webSocket.sendJson = function(object) {
+            connection.webSocket.send(JSON.stringify(object));
+        };
         connection.webSocket.onopen = function(event) {
             // TODO: subscribe to logs about uuids in
             // connection.store, not everything.
             connection.webSocket.sendJson({method:'subscribe'});
-        };
-        connection.webSocket.sendJson = function(object) {
-            connection.webSocket.send(JSON.stringify(object));
         };
         connection.webSocket.onmessage = function(event) {
             var message = JSON.parse(event.data);
@@ -242,7 +242,13 @@ function ArvadosConnection(apiPrefix) {
                 objectProp()._cacheTime = new Date();
                 m.redraw();
             }
-        }
+        };
+        connection.webSocket.onclose = function(event) {
+            setupWebSocket.backoff = (setupWebSocket.backoff || 1) * 2 + 1;
+            console.log("Websocket closed with code=" + event.code +
+                        ", retry in "+setupWebSocket.backoff+"s");
+            window.setTimeout(setupWebSocket, setupWebSocket.backoff*1000);
+        };
     }
 }
 ArvadosConnection.connections = {};
