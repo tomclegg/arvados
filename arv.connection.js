@@ -24,7 +24,7 @@ function ArvadosConnection(apiPrefix) {
     connection.find = find;
     connection.loginLink = loginLink;
     connection.token = token;
-    connection.webSocket = m.prop();
+    connection.webSocket = m.prop({});
 
     // Initialize
 
@@ -207,17 +207,23 @@ function ArvadosConnection(apiPrefix) {
     }
 
     function setupWebSocket() {
-        connection.webSocket = new WebSocket(
+        var ws;
+        if (!connection.token()) {
+            // No sense trying to connect without a valid token.
+            return connection.webSocket({});
+        }
+        ws = new WebSocket(
             dd().websocketUrl + '?api_token=' + connection.token());
-        connection.webSocket.sendJson = function(object) {
-            connection.webSocket.send(JSON.stringify(object));
+        ws.startedAt = new Date();
+        ws.sendJson = function(object) {
+            ws.send(JSON.stringify(object));
         };
-        connection.webSocket.onopen = function(event) {
+        ws.onopen = function(event) {
             // TODO: subscribe to logs about uuids in
             // connection.store, not everything.
-            connection.webSocket.sendJson({method:'subscribe'});
+            ws.sendJson({method:'subscribe'});
         };
-        connection.webSocket.onmessage = function(event) {
+        ws.onmessage = function(event) {
             var message = JSON.parse(event.data);
             var newAttrs;
             var objectProp;
@@ -243,12 +249,32 @@ function ArvadosConnection(apiPrefix) {
                 m.redraw();
             }
         };
-        connection.webSocket.onclose = function(event) {
-            setupWebSocket.backoff = (setupWebSocket.backoff || 1) * 2 + 1;
-            console.log("Websocket closed with code=" + event.code +
+        ws.onclose = function(event) {
+            if (new Date() - ws.startedAt < 60000) {
+                // If the last connection lasted less than 60 seconds,
+                // there's probably something wrong -- it's not just
+                // the expected occasional server reset or network
+                // interruption -- so we should make sure to use a
+                // pessimistic retry delay of at least 60 seconds, and
+                // use ever-increasing delays until the connection
+                // starts staying alive for more than a minute at a
+                // time.
+                setupWebSocket.backoff = Math.min(
+                    (setupWebSocket.backoff || 30), 30) * 2 + 1;
+            }
+            else {
+                // The last connection lasted more than a
+                // minute. Let's assume this is just a brief
+                // interruption and things are going well most of the
+                // time: delay 5 seconds, then try again.
+                setupWebSocket.backoff = 5;
+            }
+            console.log("Websocket closed at " + new Date() +
+                        " with code=" + event.code +
                         ", retry in "+setupWebSocket.backoff+"s");
             window.setTimeout(setupWebSocket, setupWebSocket.backoff*1000);
         };
+        return connection.webSocket(ws);
     }
 }
 ArvadosConnection.connections = {};

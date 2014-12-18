@@ -27,7 +27,7 @@ function ArvBsApistatus(connection, apiPrefix) {
                     href: 'https://arvados.org/projects/arvados/repository/changes?rev=' + vm.dd().source_version
                 }, vm.dd().source_version),
                 generatedAt: vm.dd().generatedAt,
-                websocket: util.choose(vm.connection.webSocket.readyState, {
+                websocket: util.choose(vm.connection.webSocket().readyState, {
                     0: m('span.label.label-warning', ['connecting']),
                     1: m('span.label.label-success', ['OK']),
                     2: m('span.label.label-danger', ['closing']),
