@@ -48,7 +48,7 @@ function ArvadosConnection(apiPrefix) {
     function loginLink() {
         if (!dd()) return null;
         return dd().rootUrl + 'login?return_to=' + encodeURIComponent(
-            (location.origin + '/?/login-callback?apiPrefix=' + apiPrefix +
+            (location.href.replace(/\?.*/,'') + '?/login-callback?apiPrefix=' + apiPrefix +
              '&return_to=' + encodeURIComponent(m.route())));
     }
 
